@@ -1,0 +1,482 @@
+---Minecraft 🦊
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local ContextActionService = game:GetService("ContextActionService")
+
+_G.AllPlacedBlocks = _G.AllPlacedBlocks or {}
+
+local player = Players.LocalPlayer
+local camera = workspace.CurrentCamera
+local PlayerGui = player:WaitForChild("PlayerGui")
+
+-- HAND SWING (R6 + R15)
+local rightShoulder
+local defaultC0
+local swingTween
+
+local function setupArm()
+    local char = player.Character or player.CharacterAdded:Wait()
+    local humanoid = char:WaitForChild("Humanoid")
+
+    if humanoid.RigType == Enum.HumanoidRigType.R15 then
+        rightShoulder = char:WaitForChild("RightUpperArm"):WaitForChild("RightShoulder")
+    else
+        rightShoulder = char:WaitForChild("Torso"):WaitForChild("Right Shoulder")
+    end
+
+    defaultC0 = rightShoulder.C0
+end
+
+setupArm()
+player.CharacterAdded:Connect(setupArm)
+
+local function playHandSwing()
+    if not rightShoulder or not defaultC0 then return end
+    if swingTween then pcall(function() swingTween:Cancel() end) end
+
+    local swingC0 = defaultC0 * CFrame.Angles(
+        math.rad(-45),
+        math.rad(10),
+        math.rad(5)
+    )
+
+    swingTween = TweenService:Create(
+        rightShoulder,
+        TweenInfo.new(0.08),
+        { C0 = swingC0 }
+    )
+    swingTween:Play()
+
+    task.delay(0.12, function()
+        if rightShoulder then
+            TweenService:Create(
+                rightShoulder,
+                TweenInfo.new(0.06),
+                { C0 = defaultC0 }
+            ):Play()
+        end
+    end)
+end
+
+-- TOOL CREATION
+local tool = Instance.new("Tool")
+tool.Name = "Grass Block"
+tool.RequiresHandle = false
+tool.TextureId = "rbxassetid://100389947609805"
+tool.Parent = player:WaitForChild("Backpack")
+
+-- CREATE handle
+if tool:FindFirstChild("Handle") then tool.Handle:Destroy() end
+local handle = Instance.new("Part")
+handle.Name = "Handle"
+handle.Size = Vector3.new(1,1,1)
+handle.Anchored = false
+handle.CanCollide = true
+handle.Material = Enum.Material.SmoothPlastic
+handle.BrickColor = BrickColor.new("Bright green")
+handle.Parent = tool
+
+-- Apply textures
+local TEXTURE_FRONT  = "rbxassetid://9267155972"
+local TEXTURE_BACK   = "rbxassetid://9267155972"
+local TEXTURE_LEFT   = "rbxassetid://9267155972"
+local TEXTURE_RIGHT  = "rbxassetid://9267155972"
+local TEXTURE_TOP    = "rbxassetid://9267183930"
+local TEXTURE_BOTTOM = "rbxassetid://7901287342"
+local function addTextures(part)
+    part.Transparency = 0
+    local sides = {
+        [Enum.NormalId.Front]  = TEXTURE_FRONT,
+        [Enum.NormalId.Back]   = TEXTURE_BACK,
+        [Enum.NormalId.Left]   = TEXTURE_LEFT,
+        [Enum.NormalId.Right]  = TEXTURE_RIGHT,
+        [Enum.NormalId.Top]    = TEXTURE_TOP,
+        [Enum.NormalId.Bottom] = TEXTURE_BOTTOM
+    }
+    
+    for face, texId in pairs(sides) do
+        local tex = Instance.new("Texture")
+        tex.Texture = texId
+        tex.Face = face
+        tex.StudsPerTileU = 4
+        tex.StudsPerTileV = 4
+        tex.Parent = part
+    end
+end
+addTextures(handle)
+
+-- Grip settings
+tool.GripPos = Vector3.new(0,0,0)
+tool.GripForward = Vector3.new(0,0,-1)
+tool.GripUp = Vector3.new(0,1,0)
+tool.GripRight = Vector3.new(1,0,0)
+
+-- SETTINGS
+local SNAP = 4
+local BLOCK_SIZE = Vector3.new(SNAP,SNAP,SNAP)
+local PLACE_DEBOUNCE = 0.08
+local DELETE_DEBOUNCE = 0.08
+-- MULTI SOUND SYSTEM (spam safe)
+local SoundService = game:GetService("SoundService")
+
+local PLACE_SOUNDS = {
+    "rbxassetid://83249973538428",
+    "rbxassetid://73077365148421",
+    "rbxassetid://82357128779870"
+}
+
+local BREAK_SOUNDS = {
+    "rbxassetid://80027112124187",
+    "rbxassetid://109162697779331",
+    "rbxassetid://97013891382013"
+}
+
+local function playRandomSound(soundList, volume)
+    local s = Instance.new("Sound")
+    s.SoundId = soundList[math.random(#soundList)]
+    s.Volume = volume or 1
+    s.Parent = SoundService
+    s:Play() 
+    s.Ended:Connect(function()
+        s:Destroy()
+    end)
+end
+
+-- GUI ICONS
+local ICON_PLACE = "rbxassetid://131671595489462"
+local ICON_BREAK = "rbxassetid://81259206229909"
+local ICON_LOCK_ON = "rbxassetid://110551370491526"
+local ICON_LOCK_OFF = "rbxassetid://127092408629184"
+local ICON_SELECT_ON = "rbxassetid://76853425157885"
+local ICON_SELECT_OFF = "rbxassetid://74597174646657"
+local ICON_FREE_ON = "rbxassetid://76976479685617"
+local ICON_FREE_OFF = "rbxassetid://85936912479968"
+
+-- Globals
+local lastPlaced = 0
+local lastDeleted = 0
+local previewBlock, highlight
+local placeButton, deleteButton, lockButton, selectButton, freeMoveButton
+local lockMode = false
+local selectMode = true
+local freeMove = false -- new: free preview toggle
+local lastPreviewPos
+local previewTween
+local guiParent
+
+-- Helpers
+local function s(v) return math.floor(v / SNAP + 0.5) * SNAP end
+local function snapToGrid(pos) return Vector3.new(s(pos.X), s(pos.Y), s(pos.Z)) end
+local function tweenBlock(part, goal, time)
+    local tinfo = TweenInfo.new(time or 0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out)
+    local tw = TweenService:Create(part, tinfo, goal)
+    tw:Play()
+    return tw
+end
+local function animatePlaceBlock(block)
+    tweenBlock(block, {Size = BLOCK_SIZE*1.2},0.18)
+    task.wait(0.18)
+    tweenBlock(block, {Size = BLOCK_SIZE},0.09)
+end
+local function buildRaycastFilterList()
+    local list = {}
+    if player.Character then table.insert(list, player.Character) end
+    if selectMode and previewBlock then table.insert(list, previewBlock) end
+    return list
+end
+local function updatePreviewCollision()
+    if not previewBlock then return end
+    local shouldCollide = not selectMode
+    if shouldCollide and player.Character then
+        local pos = previewBlock.Position
+        local half = BLOCK_SIZE/2
+        for _, part in ipairs(player.Character:GetDescendants()) do
+            if part:IsA("BasePart") then
+                local dx,dy,dz = math.abs(part.Position.X-pos.X), math.abs(part.Position.Y-pos.Y), math.abs(part.Position.Z-pos.Z)
+                if dx <= part.Size.X/2+half.X and dy <= part.Size.Y/2+half.Y and dz <= part.Size.Z/2+half.Z then
+                    shouldCollide = false
+                    break
+                end
+            end
+        end
+    end
+    previewBlock.CanCollide = shouldCollide
+end
+
+-- PLACE/DELETE
+local function placeBlockAtPosition(worldPos)
+playHandSwing()
+    if not worldPos then return end
+    if tick()-lastPlaced < PLACE_DEBOUNCE then return end
+    lastPlaced = tick()
+    -- Respect freeMove mode
+    local center = (freeMove and worldPos) or snapToGrid(worldPos)
+    for _, b in ipairs(_G.AllPlacedBlocks) do if (b.Position-center).Magnitude < 0.1 then return end end
+    local block = Instance.new("Part")
+    block.Size = BLOCK_SIZE
+    block.Anchored = true
+    block.CanCollide = true
+    block.Material = Enum.Material.SmoothPlastic
+    block.BrickColor = BrickColor.new("Bright green")
+    block.CFrame = CFrame.new(center)
+    block.Name = "ClientBlock"
+    block.Parent = workspace
+    table.insert(_G.AllPlacedBlocks, block)
+    addTextures(block)
+    playRandomSound(PLACE_SOUNDS, 1)
+    animatePlaceBlock(block)
+end
+local function deleteBlockAtPosition(worldPos)
+playHandSwing()
+    if not worldPos then return end
+    if tick()-lastDeleted < DELETE_DEBOUNCE then return end
+    lastDeleted = tick()
+    local nearest, dist, idx
+    for i,b in ipairs(_G.AllPlacedBlocks) do
+        local d = (b.Position-worldPos).Magnitude
+        if not dist or d<dist then nearest,dist,idx = b,d,i end
+    end
+    if nearest and dist and dist<SNAP then
+        playRandomSound(BREAK_SOUNDS, 1)
+        task.defer(function()
+            table.remove(_G.AllPlacedBlocks, idx)
+            nearest:Destroy()
+            playRandomSound(BREAK_SOUNDS, 1)
+        end)
+    end
+end
+
+-- PREVIEW
+local function makePreview()
+    if previewBlock then return end
+    previewBlock = Instance.new("Part")
+    previewBlock.Size = BLOCK_SIZE
+    previewBlock.Anchored = true
+    previewBlock.CanCollide = false
+    previewBlock.Transparency = 0.9
+    previewBlock.Material = Enum.Material.Neon
+    previewBlock.BrickColor = BrickColor.new("White")
+    previewBlock.Name = "PreviewBlock"
+    previewBlock.Parent = workspace
+
+    highlight = Instance.new("Highlight")
+    highlight.FillTransparency = 0.9
+    highlight.OutlineTransparency = 0.9
+    highlight.OutlineColor = Color3.fromRGB(0,255,0)
+    highlight.Parent = previewBlock
+
+    updatePreviewCollision()
+end
+local function removePreview()
+    if previewBlock then
+        if previewTween then pcall(function() previewTween:Cancel() end) previewTween=nil end
+        previewBlock:Destroy()
+        previewBlock=nil
+        highlight=nil
+    end
+end
+
+local function getLockRayOrigin()
+    if player.Character and player.Character:FindFirstChild("Head") then return player.Character.Head.Position end
+    return camera.CFrame.Position
+end
+
+-- GUI
+local function createGUI()
+    if PlayerGui:FindFirstChild("BlockPlacerGUI") then PlayerGui.BlockPlacerGUI:Destroy() task.wait(0.05) end
+    local screenGui = Instance.new("ScreenGui")
+    screenGui.Name="BlockPlacerGUI"
+    screenGui.ResetOnSpawn=false
+    screenGui.IgnoreGuiInset=true
+    screenGui.Parent = PlayerGui
+    guiParent = screenGui
+
+    local function makeBtn(img,pos)
+        local btn = Instance.new("ImageButton")
+        btn.Size=UDim2.new(0,80,0,80)
+        btn.Position=pos
+        btn.BackgroundColor3=Color3.new(0,0,0)
+        btn.BackgroundTransparency=1
+        btn.Image=img
+        btn.ScaleType=Enum.ScaleType.Fit
+        btn.Parent=screenGui
+        local corner = Instance.new("UICorner")
+        corner.CornerRadius=UDim.new(0,8)
+        corner.Parent=btn
+        return btn
+    end
+    placeButton = makeBtn(ICON_PLACE, UDim2.new(1,-90,1,-180))
+    lockButton = makeBtn(ICON_LOCK_OFF, UDim2.new(1,-90,1,-260))
+    selectButton = makeBtn(selectMode and ICON_SELECT_ON or ICON_SELECT_OFF, UDim2.new(1,-90,1,-340))
+    deleteButton = makeBtn(ICON_BREAK, UDim2.new(1,-180,1,-180))
+    freeMoveButton = makeBtn(freeMove and ICON_FREE_ON or ICON_FREE_OFF, UDim2.new(1,-180,1,-260))
+
+    local function setupHold(button, callback)
+    local pressTime
+    local touchStartPos
+
+    button.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            pressTime = tick()
+            touchStartPos = input.Position
+        end
+    end)
+
+    button.InputEnded:Connect(function(input)
+        if not pressTime then return end
+        if input.UserInputType == Enum.UserInputType.MouseButton1
+        or input.UserInputType == Enum.UserInputType.Touch then
+            local touchEndPos = input.Position
+            local movedDistance = (touchEndPos - touchStartPos).Magnitude
+
+            -- Only trigger if finger didn’t move too much
+            if movedDistance < 15 then
+                pcall(callback)
+            end
+            pressTime = nil
+        end
+    end)
+end
+
+    setupHold(placeButton,function()
+        local targetPos
+        if lockMode then
+            local rayOrigin=getLockRayOrigin()
+            local rayDirection=camera.CFrame.LookVector*100
+            local params=RaycastParams.new()
+            params.FilterType=Enum.RaycastFilterType.Blacklist
+            params.FilterDescendantsInstances=buildRaycastFilterList()
+            local result=workspace:Raycast(rayOrigin,rayDirection,params)
+            targetPos=result and result.Position or lastPreviewPos or (rayOrigin+rayDirection.Unit*10)
+        else
+            targetPos = previewBlock and previewBlock.Position
+        end
+        if targetPos then placeBlockAtPosition(targetPos) end
+    end)
+    setupHold(deleteButton,function()
+        local targetPos
+        if lockMode then
+            local rayOrigin=getLockRayOrigin()
+            local rayDirection=camera.CFrame.LookVector*100
+            local params=RaycastParams.new()
+            params.FilterType=Enum.RaycastFilterType.Blacklist
+            params.FilterDescendantsInstances=buildRaycastFilterList()
+            local result=workspace:Raycast(rayOrigin,rayDirection,params)
+            targetPos=result and result.Position or lastPreviewPos or (rayOrigin+rayDirection.Unit*10)
+        else
+            targetPos = previewBlock and previewBlock.Position
+        end
+        if targetPos then deleteBlockAtPosition(targetPos) end
+    end)
+    setupHold(lockButton,function()
+        lockMode=not lockMode
+        lockButton.Image=lockMode and ICON_LOCK_ON or ICON_LOCK_OFF
+    end)
+    setupHold(selectButton,function()
+        selectMode=not selectMode
+        selectButton.Image=selectMode and ICON_SELECT_ON or ICON_SELECT_OFF
+        if previewBlock then updatePreviewCollision() end
+    end)
+    setupHold(freeMoveButton,function()
+        freeMove = not freeMove
+        freeMoveButton.Image = freeMove and ICON_FREE_ON or ICON_FREE_OFF
+    end)
+end
+
+-- RenderStepped preview
+RunService.RenderStepped:Connect(function()
+    if not previewBlock then return end
+    local targetPos
+    if lockMode then
+        local rayOrigin=getLockRayOrigin()
+        local rayDir=camera.CFrame.LookVector*100
+        local params=RaycastParams.new()
+        params.FilterType=Enum.RaycastFilterType.Blacklist
+        params.FilterDescendantsInstances=buildRaycastFilterList()
+        local result=workspace:Raycast(rayOrigin,rayDir,params)
+        targetPos=result and result.Position or lastPreviewPos or (rayOrigin+rayDir.Unit*10)
+    else
+        local m=player:GetMouse()
+        if m and m.Hit then targetPos=m.Hit.p end
+    end
+    if targetPos then
+        lastPreviewPos=targetPos
+        local pos = freeMove and targetPos or snapToGrid(targetPos)
+        if previewTween then pcall(function() previewTween:Cancel() end) end
+        previewTween = tweenBlock(previewBlock,{CFrame=CFrame.new(pos)},0.1)
+        updatePreviewCollision()
+        -- color for freeMove vs grid mode
+        if freeMove then
+            previewBlock.BrickColor=BrickColor.new("White")
+            if highlight then highlight.OutlineColor=Color3.fromRGB(0,255,0) end
+        else
+            local exists=false
+            for _,b in ipairs(_G.AllPlacedBlocks) do
+                if (b.Position-pos).Magnitude<0.1 then exists=true break end
+            end
+            if exists then
+                previewBlock.BrickColor=BrickColor.new("Really red")
+                if highlight then highlight.OutlineColor=Color3.fromRGB(255,0,0) end
+            else
+                previewBlock.BrickColor=BrickColor.new("White")
+                if highlight then highlight.OutlineColor=Color3.fromRGB(0,255,0) end
+            end
+        end
+    end
+end)
+
+-- Tool events
+tool.Equipped:Connect(function() makePreview() createGUI() end)
+tool.Unequipped:Connect(function() removePreview() if PlayerGui:FindFirstChild("BlockPlacerGUI") then PlayerGui.BlockPlacerGUI:Destroy() end end)
+
+-- PC keybinds
+local function getTargetPosForAction()
+    if lockMode then
+        local rayOrigin=getLockRayOrigin()
+        local rayDir=camera.CFrame.LookVector*100
+        local params=RaycastParams.new()
+        params.FilterType=Enum.RaycastFilterType.Blacklist
+        params.FilterDescendantsInstances=buildRaycastFilterList()
+        local result=workspace:Raycast(rayOrigin,rayDir,params)
+        return result and result.Position or lastPreviewPos or (rayOrigin+rayDir.Unit*10)
+    else
+        return previewBlock and previewBlock.Position
+    end
+end
+local function bindAction(func,key) ContextActionService:BindActionAtPriority(key,func,false,Enum.ContextActionPriority.Default.Value,key) end
+bindAction(function(_,state) if state==Enum.UserInputState.Begin then local t=getTargetPosForAction() if t then placeBlockAtPosition(t) end end end, Enum.KeyCode.E)
+bindAction(function(_,state) if state==Enum.UserInputState.Begin then local t=getTargetPosForAction() if t then deleteBlockAtPosition(t) end end end, Enum.KeyCode.R)
+bindAction(function(_,state) if state==Enum.UserInputState.Begin then lockMode=not lockMode if lockButton then lockButton.Image=lockMode and ICON_LOCK_ON or ICON_LOCK_OFF end end end, Enum.KeyCode.Q)
+bindAction(function(_,state) if state==Enum.UserInputState.Begin then selectMode=not selectMode if selectButton then selectButton.Image=selectMode and ICON_SELECT_ON or ICON_SELECT_OFF end if previewBlock then updatePreviewCollision() end end end, Enum.KeyCode.F)
+bindAction(function(_,state) if state==Enum.UserInputState.Begin then if player.Character and player.Character:FindFirstChildOfClass("Tool") then local h=player.Character:FindFirstChildOfClass("Humanoid") if h then h:UnequipTools() end else if tool.Parent~=player.Backpack then tool.Parent=player.Backpack end end end end, Enum.KeyCode.Z)
+
+-- Left-click / Right-click
+tool.Activated:Connect(function()
+    if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then return end
+    local t=getTargetPosForAction()
+    if t then placeBlockAtPosition(t) end
+end)
+UserInputService.InputBegan:Connect(function(input,gp)
+    if gp then return end
+    if input.UserInputType==Enum.UserInputType.MouseButton2 then
+        if not tool.Parent or (tool.Parent~=player.Character and tool.Parent~=player.Backpack) then return end
+        local t=getTargetPosForAction()
+        if t then deleteBlockAtPosition(t) end
+    end
+end)
+
+-- Clean up
+player.AncestryChanged:Connect(function()
+    if not player:IsDescendantOf(game) then
+        pcall(function()
+            ContextActionService:UnbindAction("ActionPlaceBlock")
+            ContextActionService:UnbindAction("ActionDeleteBlock")
+            ContextActionService:UnbindAction("ActionToggleLock")
+            ContextActionService:UnbindAction("ActionToggleSelect")
+            ContextActionService:UnbindAction("ActionToggleEquip")
+        end)
+    end
+end)
