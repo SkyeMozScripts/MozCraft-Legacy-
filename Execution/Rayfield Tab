@@ -1,1 +1,199 @@
+local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
 
+local ClickSound = Instance.new("Sound")
+ClickSound.SoundId = "rbxassetid://535716488"
+ClickSound.Volume = 1
+ClickSound.Parent = game.Players.LocalPlayer:WaitForChild("PlayerGui")
+function PlayClick()
+    ClickSound:Play()
+end
+
+local Window = Rayfield:CreateWindow({
+    Name = "MozCraft",
+    Icon = 124529086555369, 
+    LoadingTitle = "MozCraft: The Blocks Update",
+    LoadingSubtitle = "SkyeMoz",
+    ShowText = "Creative UI",
+    Theme = "DarkBlue",
+    ToggleUIKeybind = "Z",
+    DisableRayfieldPrompts = false,
+    DisableBuildWarnings = false,
+
+    ConfigurationSaving = {
+        Enabled = true,
+        FolderName = nil, 
+        FileName = "Hub"
+    },
+
+    Discord = {
+        Enabled = false, 
+        Invite = "wKVgf2EDGZ",
+        RememberJoins = true
+    },
+
+    KeySystem = false,  
+    KeySettings = {
+        Title = "MozCraft ",
+        Subtitle = "Key System",
+        Note = "No method of obtaining the key is provided",
+        FileName = "Key",
+        SaveKey = true,
+        GrabKeyFromSite = false,
+        Key = {"Key_41414"}  
+    }
+})
+
+local Tab = Window:CreateTab("Info", 9405926389)
+local Section = Tab:CreateSection("Social")
+local Button = Tab:CreateButton({
+   Name = "Discord (Recommended)",
+   Callback = function()
+     PlayClick()  
+     setclipboard("https://discord.gg/wKVgf2EDGZ") 
+     Rayfield:Notify({Title = "Discord", Content = "Copied!", Duration = 2})
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Youtube",
+   Callback = function()
+     PlayClick()  
+     setclipboard("https://youtu.be/OSu7Da0eIfg?si=YbFWG-Z1vmgnnKVH") 
+     Rayfield:Notify({Title = "Youtube", Content = "Copied!", Duration = 2})
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Keybinds Guide",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Function/Tutorial",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Tiktok",
+   Callback = function()
+     PlayClick()  
+     setclipboard("tiktok.com/@skyemoz") 
+     Rayfield:Notify({Title = "Tiktok", Content = "Copied!", Duration = 2})
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Roblox",
+   Callback = function()
+     PlayClick()  
+     setclipboard("SkyexJLBank") 
+     Rayfield:Notify({Title = "Roblox", Content = "Copied!", Duration = 2})
+   end,
+})
+local Section = Tab:CreateSection("Updates And Announcements")
+local Paragraph = Tab:CreateParagraph({Title = "The Blocks Update", Content = "Mozcraft V2 Has arrived! ðŸš€ Pc is now supported! With Various of New Blocks. KeyBinds for PC! E = PLACE, R = DELETE, LEFT CLICK = PLACE, RIGHT CLICK = DELETE, Q = TOGGLE SHIFTLOCK"})
+local Tab = Window:CreateTab("Construction", 108217791045618) 
+local Section = Tab:CreateSection("Plank Blocks")
+local Button = Tab:CreateButton({
+   Name = "Oak Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Oak",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Dark Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Dark",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Bamboo Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Bamboo",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Cherry Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Cherry",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Birch Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Birch",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Acacia Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Acacia",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Crimson Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Crimson",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Warped Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Warped",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Jungle Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Jungle",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Mangrove Planks",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Construction/Planks/Mangrove",true))()
+   end,
+})
+local Tab = Window:CreateTab("Nature", 102726313359152) 
+local Section = Tab:CreateSection("Ground")
+local Button = Tab:CreateButton({
+   Name = "Bedrock",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Nature/Bedrock",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Grass Block",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Nature/Grass",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Stone Block",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Nature/Stone",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Dirt",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Nature/Dirt",true))()
+   end,
+})
+local Button = Tab:CreateButton({
+   Name = "Snow Grass Block",
+   Callback = function()
+   PlayClick()
+   loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMoz/MozCraft/refs/heads/main/Main/Blocks/Nature/SnowGrass",true))()
+   end,
+})
+local Tab = Window:CreateTab("Items",126494981034661 ) 
+local Section = Tab:CreateSection("Slimy/Jellies")
