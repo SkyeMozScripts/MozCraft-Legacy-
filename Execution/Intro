@@ -141,7 +141,7 @@ spawn(function()
 
     -- execute your loadstrings automatically
     pcall(function()
-    https://raw.githubusercontent.com/SkyeMozScripts/MozCraft-Legacy-/refs/heads/main/Execution/Rayfield%20Tab
+        loadstring(game:HttpGet("https://raw.githubusercontent.com/SkyeMozScripts/MozCraft-Legacy-/refs/heads/main/Execution/Intro"))
     end)
 
     -- cleanup GUI
